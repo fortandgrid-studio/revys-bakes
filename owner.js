@@ -18,16 +18,32 @@ async function loadOrders() {
     document.querySelector("#lastUpdated").textContent = `Updated ${new Date().toLocaleTimeString()}`;
     document.querySelector("#ordersTable").innerHTML = data.orders.length ? `<table><thead><tr><th>Order</th><th>Customer</th><th>Pickup</th><th>Items</th><th>Total</th><th>Payment proof</th><th>Status</th></tr></thead><tbody>${data.orders.map(order => `<tr><td data-label="Order"><strong>#${order.id.slice(0,8)}</strong><small>${new Date(order.created_at).toLocaleString()}</small></td><td data-label="Customer"><strong>${escapeHtml(order.customer_name)}</strong><small>${escapeHtml(order.customer_phone)}</small></td><td data-label="Pickup">${escapeHtml(order.pickup_details)}<small>${escapeHtml(order.pickup_time)}</small></td><td data-label="Items">${formatItems(order.items_json)}</td><td data-label="Total"><strong>${money(order.total)}</strong></td><td data-label="Payment proof"><button class="receipt-button" data-receipt="${escapeHtml(order.id)}">Open proof</button></td><td data-label="Status"><select class="order-status-select" data-order="${escapeHtml(order.id)}"><option value="pending" selected>Pending review</option><option value="done">Done</option><option value="invalid_payment">Invalid payment</option></select></td></tr>`).join("")}</tbody></table>` : '<p class="owner-empty">No pending orders.</p>';
     document.querySelectorAll(".receipt-button").forEach(button => button.onclick = () => loadReceipt(button));
-    document.querySelectorAll(".order-status-select").forEach(select => select.onchange = () => updateStatus(select));
+    document.querySelectorAll(".order-status-select").forEach(select => {
+      select.dataset.previous = select.value;
+      select.onchange = () => confirmStatusChange(select);
+    });
   } catch (requestError) {
     console.error(requestError);
     error.textContent = "Could not reach the orders API. Check the deployed Pages URL and try again.";
   }
-  async function updateStatus(select) {
+  function confirmStatusChange(select) {
+    const nextStatus = select.value;
+    const messages = {
+      done: "Mark this order as done? It will disappear from the pending orders list.",
+      invalid_payment: "Reject this order as invalid payment? It will disappear from the pending orders list.",
+      pending: "Keep this order pending for review?"
+    };
+    if (!window.confirm(messages[nextStatus])) {
+      select.value = select.dataset.previous || "pending";
+      return;
+    }
+    updateStatus(select, nextStatus);
+  }
+  async function updateStatus(select, nextStatus) {
     const previous = select.dataset.previous || "pending";
     select.disabled = true;
     try {
-      const response = await fetch(api, { method: "PATCH", headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ id: select.dataset.order, status: select.value }) });
+      const response = await fetch(api, { method: "PATCH", headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ id: select.dataset.order, status: nextStatus }) });
       if (!response.ok) throw new Error(`Status update failed (${response.status})`);
       await loadOrders();
     } catch (requestError) {
