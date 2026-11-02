@@ -16,7 +16,7 @@ async function loadOrders() {
     const data = body; error.textContent = ""; login.hidden = true;
     document.querySelector("#orderCount").textContent = `${data.orders.length} order${data.orders.length === 1 ? "" : "s"}`;
     document.querySelector("#lastUpdated").textContent = `Updated ${new Date().toLocaleTimeString()}`;
-    document.querySelector("#ordersTable").innerHTML = data.orders.length ? `<table><thead><tr><th>Order</th><th>Customer</th><th>Pickup</th><th>Items</th><th>Total</th><th>Payment proof</th><th>Status</th></tr></thead><tbody>${data.orders.map(order => `<tr><td><strong>#${order.id.slice(0,8)}</strong><small>${new Date(order.created_at).toLocaleString()}</small></td><td><strong>${escapeHtml(order.customer_name)}</strong><small>${escapeHtml(order.customer_phone)}</small></td><td>${escapeHtml(order.pickup_details)}<small>${escapeHtml(order.pickup_time)}</small></td><td>${formatItems(order.items_json)}</td><td><strong>${money(order.total)}</strong></td><td><button class="receipt-button" data-receipt="${escapeHtml(order.id)}">View receipt</button><img class="owner-receipt" data-receipt-image="${escapeHtml(order.id)}" alt="Payment receipt" hidden /></td><td><span class="order-status">${escapeHtml(order.status)}</span></td></tr>`).join("")}</tbody></table>` : '<p class="owner-empty">No orders yet.</p>';
+    document.querySelector("#ordersTable").innerHTML = data.orders.length ? `<table><thead><tr><th>Order</th><th>Customer</th><th>Pickup</th><th>Items</th><th>Total</th><th>Payment proof</th><th>Status</th></tr></thead><tbody>${data.orders.map(order => `<tr><td><strong>#${order.id.slice(0,8)}</strong><small>${new Date(order.created_at).toLocaleString()}</small></td><td><strong>${escapeHtml(order.customer_name)}</strong><small>${escapeHtml(order.customer_phone)}</small></td><td>${escapeHtml(order.pickup_details)}<small>${escapeHtml(order.pickup_time)}</small></td><td>${formatItems(order.items_json)}</td><td><strong>${money(order.total)}</strong></td><td><button class="receipt-button" data-receipt="${escapeHtml(order.id)}">Open proof</button></td><td><span class="order-status">${escapeHtml(order.status)}</span></td></tr>`).join("")}</tbody></table>` : '<p class="owner-empty">No orders yet.</p>';
     document.querySelectorAll(".receipt-button").forEach(button => button.onclick = () => loadReceipt(button));
   } catch (requestError) {
     console.error(requestError);
@@ -24,7 +24,6 @@ async function loadOrders() {
   }
   async function loadReceipt(button) {
     const id = button.dataset.receipt;
-    const image = document.querySelector(`img[data-receipt-image="${id}"]`);
     button.disabled = true;
     button.textContent = "Loading…";
     try {
@@ -38,11 +37,7 @@ async function loadOrders() {
       openLink.rel = "noopener";
       openLink.textContent = "Open / download proof";
       openLink.className = "receipt-open-link";
-      image.parentElement.appendChild(openLink);
-      image.onerror = () => { image.hidden = true; };
-      image.src = url;
-      image.hidden = false;
-      button.textContent = "Receipt loaded";
+      button.replaceWith(openLink);
     } catch (requestError) {
       console.error(requestError);
       button.textContent = "Could not load";
