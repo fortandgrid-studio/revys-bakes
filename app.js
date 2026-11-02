@@ -1,19 +1,19 @@
 const cookies = [
-  {id:'classic',name:'Classic Dark Chocolate',price:90,desc:'Brown butter, dark chocolate & sea salt.',badge:'BEST SELLER'},
-  {id:'triple',name:'Triple Chocolate',price:99,desc:'Dark, milk & white chocolate. All the chocolate.',badge:'CHOCOLATE'},
-  {id:'revel',name:'Revel Oats',price:99,desc:'Chewy oats, fudgy center & dark chocolate drizzle.',unavailable:true},
-  {id:'chocnut',name:'Choc Nut',price:95,desc:'Choc Nut, chocolate chunks & a sweet-salty finish.',badge:'PINOY TWIST'},
-  {id:'ube',name:'Ube White Choco',price:99,desc:'Ube cookie, creamy white chocolate & sweet crumbs.',badge:'PINOY TWIST'},
-  {id:'korean',name:'Korean Dark Choco',price:99,desc:'Gochujang, sesame & a gentle spicy aftertaste.',badge:'PINOY TWIST'},
-  {id:'viet',name:'Viet Marble',price:99,desc:'Creamy milk, strong espresso & a chewy coffee rush.',unavailable:true},
-  {id:'hojicha',name:'Hojicha Earl Grey',price:99,desc:'Roasted hojicha, Earl Grey & dark chocolate.',badge:'TEA SERIES'},
-  {id:'pistachio',name:'Pistachio Thai Milk Tea',price:99,desc:'Thai milk tea, white chocolate & pistachios.',badge:'TEA SERIES'},
-  {id:'strawberry',name:'Strawberry Sorbetes',price:99,desc:'Strawberry, white choco & sugar cone bits.',badge:'NEW'}
+  {id:'classic',name:'Classic Dark Chocolate',price:90,desc:'Brown butter, dark chocolate & sea salt.',badge:'BEST SELLER',image:'assets/classic-dark-chocolate.jpeg'},
+  {id:'triple',name:'Triple Chocolate',price:99,desc:'Dark, milk & white chocolate. All the chocolate.',badge:'CHOCOLATE',image:'assets/triple-chocolate.jpg'},
+  {id:'revel',name:'Revel Oats',price:99,desc:'Chewy oats, fudgy center & dark chocolate drizzle.',unavailable:true,image:'assets/revel-oats.jpeg'},
+  {id:'chocnut',name:'Choc Nut',price:95,desc:'Choc Nut, chocolate chunks & a sweet-salty finish.',badge:'PINOY TWIST',image:'assets/choc-nut.jpg'},
+  {id:'ube',name:'Ube White Choco',price:99,desc:'Ube cookie, creamy white chocolate & sweet crumbs.',badge:'PINOY TWIST',image:'assets/ube-white-choco.jpg'},
+  {id:'korean',name:'Korean Dark Choco',price:99,desc:'Gochujang, sesame & a gentle spicy aftertaste.',badge:'PINOY TWIST',image:'assets/korean-dark-choco.jpeg'},
+  {id:'viet',name:'Viet Marble',price:99,desc:'Creamy milk, strong espresso & a chewy coffee rush.',unavailable:true,image:'assets/viet-marble.jpeg'},
+  {id:'hojicha',name:'Hojicha Earl Grey',price:99,desc:'Roasted hojicha, Earl Grey & dark chocolate.',badge:'TEA SERIES',image:'assets/hojicha-earl-grey.jpeg'},
+  {id:'pistachio',name:'Pistachio Thai Milk Tea',price:99,desc:'Thai milk tea, white chocolate & pistachios.',badge:'TEA SERIES',image:'assets/pistachio-thai-milk-tea.jpeg'},
+  {id:'strawberry',name:'Strawberry Sorbetes',price:99,desc:'Strawberry, white choco & sugar cone bits.',badge:'NEW',image:'assets/strawberry-sorbetes.jpg'}
 ];
 const bundles={sampler:{id:'sampler',name:'Sampler Box of 8',price:805,desc:'One of each available flavor'},tub:{id:'tub',name:"Revy's Bite Tub",price:199,desc:'Bite-sized minis of all flavors'}};
 const cart={}; const money=n=>`₱${n.toLocaleString('en-PH')}`;
 const grid=document.querySelector('#cookieGrid');
-grid.innerHTML=cookies.map(c=>`<article class="cookie-card ${c.unavailable?'unavailable':''}" data-id="${c.id}"><div class="cookie-image">${c.badge?`<span class="cookie-badge">${c.badge}</span>`:''}${c.unavailable?'<span class="status">TEMPORARILY UNAVAILABLE</span>':''}</div><div class="cookie-info"><div><h3>${c.name}</h3><p>${c.desc}</p></div><strong class="cookie-price">${money(c.price)}</strong></div>${c.unavailable?'':'<div class="qty"><button data-action="minus" aria-label="Decrease quantity">−</button><span data-qty>0</span><button data-action="plus" aria-label="Increase quantity">+</button></div>'}</article>`).join('');
+grid.innerHTML=cookies.map(c=>`<article class="cookie-card ${c.unavailable?'unavailable':''}" data-id="${c.id}"><div class="cookie-image" style="background-image:url('${c.image}')">${c.badge?`<span class="cookie-badge">${c.badge}</span>`:''}${c.unavailable?'<span class="status">TEMPORARILY UNAVAILABLE</span>':''}</div><div class="cookie-info"><div><h3>${c.name}</h3><p>${c.desc}</p></div><strong class="cookie-price">${money(c.price)}</strong></div>${c.unavailable?'':'<div class="qty"><button data-action="minus" aria-label="Decrease quantity">−</button><span data-qty>0</span><button data-action="plus" aria-label="Increase quantity">+</button></div>'}</article>`).join('');
 function getItem(id){return cookies.find(c=>c.id===id)||bundles[id]}
 function totalItems(){return Object.values(cart).reduce((a,b)=>a+b,0)}
 function render(){const count=totalItems(),total=Object.entries(cart).reduce((sum,[id,q])=>sum+getItem(id).price*q,0);document.querySelector('#cartCount').textContent=count;document.querySelector('#drawerCount').textContent=`(${count})`;document.querySelector('#cartTotal').textContent=money(total);document.querySelector('#mobileTotal').firstChild.textContent=count?`${count} item${count>1?'s':''} · ${money(total)}`:'Your cart is empty';grid.querySelectorAll('[data-qty]').forEach((el)=>el.textContent=cart[el.closest('.cookie-card').dataset.id]||0);const items=document.querySelector('#drawerItems');items.innerHTML=count?Object.entries(cart).map(([id,q])=>{const i=getItem(id);return `<div class="drawer-item"><div class="drawer-thumb"></div><div class="drawer-item-info"><strong>${i.name}</strong><span>${q} × ${money(i.price)}</span></div><b class="drawer-item-price">${money(i.price*q)}</b></div>`}).join(''):'<p class="empty-cart">Your box is waiting to be filled.<br>Pick a cookie (or eight).</p>'}
