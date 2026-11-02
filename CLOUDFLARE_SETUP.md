@@ -274,3 +274,5 @@ A reasonable starting point is 10 requests per IP per minute. Adjust it if legit
 - [ ] Receipt is stored in private Neon Object Storage
 - [ ] `/owner.html` is protected with Cloudflare Access
 - [ ] `.env.local` is not in GitHub
+
+The storefront countdown is calculated in the visitor's local time and targets the next Thursday at 5:00 PM. At the cutoff it automatically rolls forward to the following Thursday.
