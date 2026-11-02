@@ -31,7 +31,6 @@ async function loadOrders() {
       const response = await fetch(`${api}?receipt=${encodeURIComponent(id)}`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
       if (!response.ok) throw new Error(`Receipt request failed (${response.status})`);
       const blob = await response.blob();
-      if (!blob.type.startsWith("image/")) throw new Error("Receipt response was not an image");
       const url = URL.createObjectURL(blob);
       image.onerror = () => { image.hidden = true; button.textContent = "Invalid image"; };
       image.src = url;

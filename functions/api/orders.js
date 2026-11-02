@@ -1,7 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
-const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_PROOF_BYTES = 5 * 1024 * 1024;
 const PHONE = /^\+63\d{10}$/;
 const CATALOG = {
@@ -29,6 +28,19 @@ function storage(env) {
       accessKeyId: env.AWS_ACCESS_KEY_ID,
       secretAccessKey: env.AWS_SECRET_ACCESS_KEY
     }
+
+    const MIME_BY_EXTENSION = {
+      jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp",
+      gif: "image/gif", bmp: "image/bmp", avif: "image/avif", svg: "image/svg+xml",
+      heic: "image/heic", heif: "image/heif", tiff: "image/tiff", tif: "image/tiff"
+    };
+
+    function receiptType(fileOrKey) {
+      const value = typeof fileOrKey === "string" ? fileOrKey : fileOrKey.type || fileOrKey.name || "";
+      if (value.startsWith("image/")) return value;
+      const extension = value.split(".").pop().toLowerCase();
+      return MIME_BY_EXTENSION[extension] || "application/octet-stream";
+    }
   });
 }
 
@@ -39,7 +51,7 @@ export async function onRequestPost({ request, env }) {
   let order;
   try { order = JSON.parse(form.get("order") || ""); } catch { return json({ error: "Invalid order payload" }, 400); }
   if (!order?.customer?.name || !PHONE.test(order.customer.phone) || !order.customer.pickupDetails || !order.customer.time) return json({ error: "Invalid customer details" }, 400);
-  if (!(proof instanceof File) || !ALLOWED_TYPES.has(proof.type) || proof.size === 0 || proof.size > MAX_PROOF_BYTES) return json({ error: "A valid receipt image up to 5MB is required" }, 400);
+  if (!(proof instanceof File) || (!proof.type.startsWith("image/") && receiptType(proof) === "application/octet-stream") || proof.size === 0 || proof.size > MAX_PROOF_BYTES) return json({ error: "Please attach an image receipt up to 5MB" }, 400);
   if (!Array.isArray(order.items) || !order.items.length) return json({ error: "Invalid cart" }, 400);
   const total = order.items.reduce((sum, item) => {
     if (!CATALOG[item.id] || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 99) return NaN;
@@ -47,12 +59,14 @@ export async function onRequestPost({ request, env }) {
   }, 0);
   if (!Number.isSafeInteger(total) || total < 1) return json({ error: "Invalid cart" }, 400);
   const id = crypto.randomUUID();
-  const proofKey = `receipts/${id}.${proof.type.split("/")[1]}`;
+  const proofType = receiptType(proof);
+  const proofExtension = proof.name.includes(".") ? proof.name.split(".").pop().toLowerCase().replace(/[^a-z0-9]/g, "") : proofType.split("/")[1];
+  const proofKey = `receipts/${id}.${proofExtension || "img"}`;
   await storage(env).send(new PutObjectCommand({
     Bucket: env.OBJECT_STORAGE_BUCKET || "assets",
     Key: proofKey,
     Body: await proof.arrayBuffer(),
-    ContentType: proof.type
+    ContentType: proofType
   }));
   await sql`INSERT INTO orders (id, created_at, customer_name, customer_phone, pickup_details, pickup_time, items_json, total, payment_proof_key) VALUES (${id}, ${new Date().toISOString()}, ${order.customer.name.trim()}, ${order.customer.phone}, ${order.customer.pickupDetails.trim()}, ${order.customer.time}, ${JSON.stringify(order.items)}, ${total}, ${proofKey})`;
   return json({ id, status: "pending" }, 201);
@@ -74,7 +88,8 @@ export async function onRequestGet({ request, env }) {
       const bytes = typeof body.transformToByteArray === "function"
         ? await body.transformToByteArray()
         : await new Response(body).arrayBuffer();
-      return new Response(bytes, { headers: { "content-type": object.ContentType || "application/octet-stream", "cache-control": "private, no-store" } });
+      const contentType = object.ContentType?.startsWith("image/") ? object.ContentType : receiptType(rows[0].payment_proof_key);
+      return new Response(bytes, { headers: { "content-type": contentType, "cache-control": "private, no-store" } });
     }
     const sql = neon(env.DATABASE_URL);
     const orders = await sql`SELECT id, created_at, status, customer_name, customer_phone, pickup_details, pickup_time, items_json, total FROM orders ORDER BY created_at DESC LIMIT 200`;
