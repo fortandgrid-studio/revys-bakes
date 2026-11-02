@@ -32,7 +32,7 @@ async function loadOrders() {
       if (!response.ok) throw new Error(`Receipt request failed (${response.status})`);
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      image.onerror = () => { image.hidden = true; button.textContent = "Invalid image"; };
+      image.onerror = () => { image.hidden = true; button.textContent = "Unable to display"; };
       image.src = url;
       image.hidden = false;
       button.textContent = "Receipt loaded";

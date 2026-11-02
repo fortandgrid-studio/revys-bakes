@@ -41,6 +41,16 @@ function storage(env) {
       const extension = value.split(".").pop().toLowerCase();
       return MIME_BY_EXTENSION[extension] || "application/octet-stream";
     }
+
+    function sniffImageType(bytes) {
+      if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+      if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
+      if (bytes.length >= 6 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return "image/gif";
+      if (bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) return "image/webp";
+      if (bytes.length >= 2 && bytes[0] === 0x42 && bytes[1] === 0x4d) return "image/bmp";
+      if (bytes.length >= 4 && ((bytes[0] === 0x49 && bytes[1] === 0x49 && bytes[2] === 0x2a && bytes[3] === 0x00) || (bytes[0] === 0x4d && bytes[1] === 0x4d && bytes[2] === 0x00 && bytes[3] === 0x2a))) return "image/tiff";
+      return "";
+    }
   });
 }
 
@@ -59,13 +69,15 @@ export async function onRequestPost({ request, env }) {
   }, 0);
   if (!Number.isSafeInteger(total) || total < 1) return json({ error: "Invalid cart" }, 400);
   const id = crypto.randomUUID();
-  const proofType = receiptType(proof);
+  const proofBytes = new Uint8Array(await proof.arrayBuffer());
+  const proofType = sniffImageType(proofBytes) || receiptType(proof);
+  if (!proofType.startsWith("image/")) return json({ error: "The attached file is not a readable image" }, 400);
   const proofExtension = proof.name.includes(".") ? proof.name.split(".").pop().toLowerCase().replace(/[^a-z0-9]/g, "") : proofType.split("/")[1];
   const proofKey = `receipts/${id}.${proofExtension || "img"}`;
   await storage(env).send(new PutObjectCommand({
     Bucket: env.OBJECT_STORAGE_BUCKET || "assets",
     Key: proofKey,
-    Body: await proof.arrayBuffer(),
+    Body: proofBytes,
     ContentType: proofType
   }));
   await sql`INSERT INTO orders (id, created_at, customer_name, customer_phone, pickup_details, pickup_time, items_json, total, payment_proof_key) VALUES (${id}, ${new Date().toISOString()}, ${order.customer.name.trim()}, ${order.customer.phone}, ${order.customer.pickupDetails.trim()}, ${order.customer.time}, ${JSON.stringify(order.items)}, ${total}, ${proofKey})`;
@@ -88,7 +100,8 @@ export async function onRequestGet({ request, env }) {
       const bytes = typeof body.transformToByteArray === "function"
         ? await body.transformToByteArray()
         : await new Response(body).arrayBuffer();
-      const contentType = object.ContentType?.startsWith("image/") ? object.ContentType : receiptType(rows[0].payment_proof_key);
+      const contentType = sniffImageType(bytes) || (object.ContentType?.startsWith("image/") ? object.ContentType : receiptType(rows[0].payment_proof_key));
+      if (!contentType.startsWith("image/")) return json({ error: "Stored receipt is not a readable image" }, 422);
       return new Response(bytes, { headers: { "content-type": contentType, "cache-control": "private, no-store" } });
     }
     const sql = neon(env.DATABASE_URL);
