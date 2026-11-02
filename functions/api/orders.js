@@ -1,5 +1,5 @@
 import { neon } from "@neondatabase/serverless";
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_PROOF_BYTES = 5 * 1024 * 1024;
@@ -62,6 +62,15 @@ export async function onRequestGet({ request, env }) {
   const auth = request.headers.get("Authorization");
   if (!auth || auth !== `Bearer ${env.OWNER_API_TOKEN}`) return json({ error: "Unauthorized" }, 401);
   try {
+    const receiptId = new URL(request.url).searchParams.get("receipt");
+    if (receiptId) {
+      if (!/^[0-9a-f-]{36}$/i.test(receiptId)) return json({ error: "Invalid receipt id" }, 400);
+      const sql = neon(env.DATABASE_URL);
+      const rows = await sql`SELECT payment_proof_key FROM orders WHERE id = ${receiptId} LIMIT 1`;
+      if (!rows.length) return json({ error: "Receipt not found" }, 404);
+      const object = await storage(env).send(new GetObjectCommand({ Bucket: env.OBJECT_STORAGE_BUCKET || "assets", Key: rows[0].payment_proof_key }));
+      return new Response(object.Body, { headers: { "content-type": object.ContentType || "application/octet-stream", "cache-control": "private, no-store" } });
+    }
     const sql = neon(env.DATABASE_URL);
     const orders = await sql`SELECT id, created_at, status, customer_name, customer_phone, pickup_details, pickup_time, items_json, total FROM orders ORDER BY created_at DESC LIMIT 200`;
     return json({ orders });
