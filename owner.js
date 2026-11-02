@@ -29,7 +29,7 @@ async function loadOrders() {
   function confirmStatusChange(select) {
     const nextStatus = select.value;
     const messages = {
-      done: "Mark this order as done? It will disappear from the pending orders list.",
+      done: "Confirm completion: mark this order as done? It will disappear from the pending orders list.",
       invalid_payment: "Reject this order as invalid payment? It will disappear from the pending orders list.",
       pending: "Keep this order pending for review?"
     };
