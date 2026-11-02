@@ -69,7 +69,12 @@ export async function onRequestGet({ request, env }) {
       const rows = await sql`SELECT payment_proof_key FROM orders WHERE id = ${receiptId} LIMIT 1`;
       if (!rows.length) return json({ error: "Receipt not found" }, 404);
       const object = await storage(env).send(new GetObjectCommand({ Bucket: env.OBJECT_STORAGE_BUCKET || "assets", Key: rows[0].payment_proof_key }));
-      return new Response(object.Body, { headers: { "content-type": object.ContentType || "application/octet-stream", "cache-control": "private, no-store" } });
+      const body = object.Body;
+      if (!body) return json({ error: "Receipt data is unavailable" }, 502);
+      const bytes = typeof body.transformToByteArray === "function"
+        ? await body.transformToByteArray()
+        : await new Response(body).arrayBuffer();
+      return new Response(bytes, { headers: { "content-type": object.ContentType || "application/octet-stream", "cache-control": "private, no-store" } });
     }
     const sql = neon(env.DATABASE_URL);
     const orders = await sql`SELECT id, created_at, status, customer_name, customer_phone, pickup_details, pickup_time, items_json, total FROM orders ORDER BY created_at DESC LIMIT 200`;
