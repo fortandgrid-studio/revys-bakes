@@ -86,8 +86,9 @@ export async function onRequestGet({ request, env }) {
     console.error("Owner orders query failed", error);
     return serverError();
   }
+}
 
-  export async function onRequestPatch({ request, env }) {
+export async function onRequestPatch({ request, env }) {
     const auth = request.headers.get("Authorization");
     if (!auth || auth !== `Bearer ${env.OWNER_API_TOKEN}`) return json({ error: "Unauthorized" }, 401);
     let payload;
@@ -104,5 +105,4 @@ export async function onRequestGet({ request, env }) {
       console.error("Owner order status update failed", error);
       return serverError();
     }
-  }
 }
