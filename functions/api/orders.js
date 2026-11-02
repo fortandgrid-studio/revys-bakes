@@ -1,7 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
-const MAX_PROOF_BYTES = 5 * 1024 * 1024;
+const MAX_PROOF_BYTES = 10 * 1024 * 1024;
 const PHONE = /^\+63\d{10}$/;
 const CATALOG = {
   classic: 90, triple: 99, chocnut: 95, ube: 99, korean: 99,
@@ -29,28 +29,6 @@ function storage(env) {
       secretAccessKey: env.AWS_SECRET_ACCESS_KEY
     }
 
-    const MIME_BY_EXTENSION = {
-      jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp",
-      gif: "image/gif", bmp: "image/bmp", avif: "image/avif", svg: "image/svg+xml",
-      heic: "image/heic", heif: "image/heif", tiff: "image/tiff", tif: "image/tiff"
-    };
-
-    function receiptType(fileOrKey) {
-      const value = typeof fileOrKey === "string" ? fileOrKey : fileOrKey.type || fileOrKey.name || "";
-      if (value.startsWith("image/")) return value;
-      const extension = value.split(".").pop().toLowerCase();
-      return MIME_BY_EXTENSION[extension] || "application/octet-stream";
-    }
-
-    function sniffImageType(bytes) {
-      if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
-      if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
-      if (bytes.length >= 6 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return "image/gif";
-      if (bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) return "image/webp";
-      if (bytes.length >= 2 && bytes[0] === 0x42 && bytes[1] === 0x4d) return "image/bmp";
-      if (bytes.length >= 4 && ((bytes[0] === 0x49 && bytes[1] === 0x49 && bytes[2] === 0x2a && bytes[3] === 0x00) || (bytes[0] === 0x4d && bytes[1] === 0x4d && bytes[2] === 0x00 && bytes[3] === 0x2a))) return "image/tiff";
-      return "";
-    }
   });
 }
 
@@ -61,7 +39,7 @@ export async function onRequestPost({ request, env }) {
   let order;
   try { order = JSON.parse(form.get("order") || ""); } catch { return json({ error: "Invalid order payload" }, 400); }
   if (!order?.customer?.name || !PHONE.test(order.customer.phone) || !order.customer.pickupDetails || !order.customer.time) return json({ error: "Invalid customer details" }, 400);
-  if (!(proof instanceof File) || (!proof.type.startsWith("image/") && receiptType(proof) === "application/octet-stream") || proof.size === 0 || proof.size > MAX_PROOF_BYTES) return json({ error: "Please attach an image receipt up to 5MB" }, 400);
+  if (!(proof instanceof File) || proof.size === 0 || proof.size > MAX_PROOF_BYTES) return json({ error: "Please attach a file up to 10MB" }, 400);
   if (!Array.isArray(order.items) || !order.items.length) return json({ error: "Invalid cart" }, 400);
   const total = order.items.reduce((sum, item) => {
     if (!CATALOG[item.id] || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 99) return NaN;
@@ -70,9 +48,8 @@ export async function onRequestPost({ request, env }) {
   if (!Number.isSafeInteger(total) || total < 1) return json({ error: "Invalid cart" }, 400);
   const id = crypto.randomUUID();
   const proofBytes = new Uint8Array(await proof.arrayBuffer());
-  const proofType = sniffImageType(proofBytes) || receiptType(proof);
-  if (!proofType.startsWith("image/")) return json({ error: "The attached file is not a readable image" }, 400);
-  const proofExtension = proof.name.includes(".") ? proof.name.split(".").pop().toLowerCase().replace(/[^a-z0-9]/g, "") : proofType.split("/")[1];
+  const proofType = proof.type || "application/octet-stream";
+  const proofExtension = proof.name.includes(".") ? proof.name.split(".").pop().toLowerCase().replace(/[^a-z0-9]/g, "") : "bin";
   const proofKey = `receipts/${id}.${proofExtension || "img"}`;
   await storage(env).send(new PutObjectCommand({
     Bucket: env.OBJECT_STORAGE_BUCKET || "assets",
@@ -100,9 +77,7 @@ export async function onRequestGet({ request, env }) {
       const bytes = typeof body.transformToByteArray === "function"
         ? await body.transformToByteArray()
         : await new Response(body).arrayBuffer();
-      const contentType = sniffImageType(bytes) || (object.ContentType?.startsWith("image/") ? object.ContentType : receiptType(rows[0].payment_proof_key));
-      if (!contentType.startsWith("image/")) return json({ error: "Stored receipt is not a readable image" }, 422);
-      return new Response(bytes, { headers: { "content-type": contentType, "cache-control": "private, no-store" } });
+      return new Response(bytes, { headers: { "content-type": object.ContentType || "application/octet-stream", "content-disposition": "inline", "cache-control": "private, no-store" } });
     }
     const sql = neon(env.DATABASE_URL);
     const orders = await sql`SELECT id, created_at, status, customer_name, customer_phone, pickup_details, pickup_time, items_json, total FROM orders ORDER BY created_at DESC LIMIT 200`;

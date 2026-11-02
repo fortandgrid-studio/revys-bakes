@@ -32,7 +32,14 @@ async function loadOrders() {
       if (!response.ok) throw new Error(`Receipt request failed (${response.status})`);
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      image.onerror = () => { image.hidden = true; button.textContent = "Unable to display"; };
+      const openLink = document.createElement("a");
+      openLink.href = url;
+      openLink.target = "_blank";
+      openLink.rel = "noopener";
+      openLink.textContent = "Open / download proof";
+      openLink.className = "receipt-open-link";
+      image.parentElement.appendChild(openLink);
+      image.onerror = () => { image.hidden = true; };
       image.src = url;
       image.hidden = false;
       button.textContent = "Receipt loaded";

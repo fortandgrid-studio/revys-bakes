@@ -61,4 +61,5 @@
 .bundle-photo:after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,#5a3b3b0d,#5a3b3b35)}
 .cookie-image::after{display:none}
 @media(max-width:800px){.cookie-image{height:138px}}
+.receipt-open-link{display:block;margin-top:8px;color:#8f665d;font-size:10px;font-weight:700;text-decoration:underline}
 .receipt-preview{display:flex;align-items:center;gap:12px;margin:10px 0 16px;padding:10px;border:1px solid #ddcfc4;border-radius:6px;background:#fffaf4;color:#715e59;font-size:11px}.receipt-preview img{width:72px;height:72px;object-fit:cover;border-radius:4px}.receipt-button{border:1px solid #d6a461;background:#fffaf4;color:#5a3b3b;border-radius:4px;padding:7px 9px;font:700 10px var(--sans);cursor:pointer}.receipt-button:disabled{opacity:.65;cursor:wait}.owner-receipt{display:block;width:110px;height:110px;object-fit:contain;margin-top:10px;border-radius:4px;background:#eadfd5}
