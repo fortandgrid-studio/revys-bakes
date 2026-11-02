@@ -80,10 +80,29 @@ export async function onRequestGet({ request, env }) {
       return new Response(bytes, { headers: { "content-type": object.ContentType || "application/octet-stream", "content-disposition": "inline", "cache-control": "private, no-store" } });
     }
     const sql = neon(env.DATABASE_URL);
-    const orders = await sql`SELECT id, created_at, status, customer_name, customer_phone, pickup_details, pickup_time, items_json, total FROM orders ORDER BY created_at DESC LIMIT 200`;
+    const orders = await sql`SELECT id, created_at, status, customer_name, customer_phone, pickup_details, pickup_time, items_json, total FROM orders WHERE status = 'pending' ORDER BY created_at DESC LIMIT 200`;
     return json({ orders });
   } catch (error) {
     console.error("Owner orders query failed", error);
     return serverError();
+  }
+
+  export async function onRequestPatch({ request, env }) {
+    const auth = request.headers.get("Authorization");
+    if (!auth || auth !== `Bearer ${env.OWNER_API_TOKEN}`) return json({ error: "Unauthorized" }, 401);
+    let payload;
+    try { payload = await request.json(); } catch { return json({ error: "Invalid status payload" }, 400); }
+    const id = typeof payload?.id === "string" ? payload.id : "";
+    const status = payload?.status;
+    if (!/^[0-9a-f-]{36}$/i.test(id) || !["pending", "done", "invalid_payment"].includes(status)) return json({ error: "Invalid order status" }, 400);
+    try {
+      const sql = neon(env.DATABASE_URL);
+      const rows = await sql`UPDATE orders SET status = ${status} WHERE id = ${id} RETURNING id, status`;
+      if (!rows.length) return json({ error: "Order not found" }, 404);
+      return json({ order: rows[0] });
+    } catch (error) {
+      console.error("Owner order status update failed", error);
+      return serverError();
+    }
   }
 }

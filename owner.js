@@ -16,11 +16,26 @@ async function loadOrders() {
     const data = body; error.textContent = ""; login.hidden = true;
     document.querySelector("#orderCount").textContent = `${data.orders.length} order${data.orders.length === 1 ? "" : "s"}`;
     document.querySelector("#lastUpdated").textContent = `Updated ${new Date().toLocaleTimeString()}`;
-    document.querySelector("#ordersTable").innerHTML = data.orders.length ? `<table><thead><tr><th>Order</th><th>Customer</th><th>Pickup</th><th>Items</th><th>Total</th><th>Payment proof</th><th>Status</th></tr></thead><tbody>${data.orders.map(order => `<tr><td data-label="Order"><strong>#${order.id.slice(0,8)}</strong><small>${new Date(order.created_at).toLocaleString()}</small></td><td data-label="Customer"><strong>${escapeHtml(order.customer_name)}</strong><small>${escapeHtml(order.customer_phone)}</small></td><td data-label="Pickup">${escapeHtml(order.pickup_details)}<small>${escapeHtml(order.pickup_time)}</small></td><td data-label="Items">${formatItems(order.items_json)}</td><td data-label="Total"><strong>${money(order.total)}</strong></td><td data-label="Payment proof"><button class="receipt-button" data-receipt="${escapeHtml(order.id)}">Open proof</button></td><td data-label="Status"><span class="order-status">${escapeHtml(order.status)}</span></td></tr>`).join("")}</tbody></table>` : '<p class="owner-empty">No orders yet.</p>';
+    document.querySelector("#ordersTable").innerHTML = data.orders.length ? `<table><thead><tr><th>Order</th><th>Customer</th><th>Pickup</th><th>Items</th><th>Total</th><th>Payment proof</th><th>Status</th></tr></thead><tbody>${data.orders.map(order => `<tr><td data-label="Order"><strong>#${order.id.slice(0,8)}</strong><small>${new Date(order.created_at).toLocaleString()}</small></td><td data-label="Customer"><strong>${escapeHtml(order.customer_name)}</strong><small>${escapeHtml(order.customer_phone)}</small></td><td data-label="Pickup">${escapeHtml(order.pickup_details)}<small>${escapeHtml(order.pickup_time)}</small></td><td data-label="Items">${formatItems(order.items_json)}</td><td data-label="Total"><strong>${money(order.total)}</strong></td><td data-label="Payment proof"><button class="receipt-button" data-receipt="${escapeHtml(order.id)}">Open proof</button></td><td data-label="Status"><select class="order-status-select" data-order="${escapeHtml(order.id)}"><option value="pending" selected>Pending review</option><option value="done">Done</option><option value="invalid_payment">Invalid payment</option></select></td></tr>`).join("")}</tbody></table>` : '<p class="owner-empty">No pending orders.</p>';
     document.querySelectorAll(".receipt-button").forEach(button => button.onclick = () => loadReceipt(button));
+    document.querySelectorAll(".order-status-select").forEach(select => select.onchange = () => updateStatus(select));
   } catch (requestError) {
     console.error(requestError);
     error.textContent = "Could not reach the orders API. Check the deployed Pages URL and try again.";
+  }
+  async function updateStatus(select) {
+    const previous = select.dataset.previous || "pending";
+    select.disabled = true;
+    try {
+      const response = await fetch(api, { method: "PATCH", headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ id: select.dataset.order, status: select.value }) });
+      if (!response.ok) throw new Error(`Status update failed (${response.status})`);
+      await loadOrders();
+    } catch (requestError) {
+      console.error(requestError);
+      select.value = previous;
+      select.disabled = false;
+      error.textContent = "Could not update this order status. Please try again.";
+    }
   }
   async function loadReceipt(button) {
     const id = button.dataset.receipt;
