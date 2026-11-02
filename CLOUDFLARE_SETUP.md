@@ -188,12 +188,31 @@ https://YOUR-PAGES-DOMAIN/owner.html
 
 Replace `YOUR-PAGES-DOMAIN` with your actual Pages domain.
 
-1. Enter the exact `OWNER_API_TOKEN` from Cloudflare.
+1. Enter the exact `OWNER_API_TOKEN` from Cloudflare. (DVrhLhrcteGHE78fPTZ0Dkh9+sd+YaSVUq0Lq/a6OJ3p5gbyg9cBfW1GHJeNIe2G)
 2. Click **Open orders**.
 3. Confirm that your test order appears.
 4. Confirm the customer, phone, pickup details, items, total, and status are formatted correctly.
 
 The dashboard refreshes orders every 30 seconds. It keeps the token in memory and does not save it to local storage.
+
+### If the dashboard does not show orders
+
+Open the browser developer tools and select **Network**. Reload the owner page and inspect:
+
+```text
+GET /api/orders
+```
+
+Use the status code to identify the problem:
+
+| Status | Meaning | Fix |
+|---|---|---|
+| `401` | The token does not match `OWNER_API_TOKEN` | Copy the exact Cloudflare secret and try again |
+| `404` | The Pages Function was not deployed | Confirm the project is Pages Git deployment and that `functions/api/orders.js` is in the repository |
+| `500` | A production variable or Neon query failed | Check all variables in Step 3 and view **Pages → Functions → Logs** |
+| Network error | Wrong site URL or deployment unavailable | Use the exact deployed Pages URL |
+
+The owner page now displays the API status and error message instead of silently showing an empty list.
 
 ## Step 8: Protect the owner page
 

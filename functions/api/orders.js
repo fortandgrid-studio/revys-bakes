@@ -16,6 +16,10 @@ function json(data, status = 200) {
   });
 }
 
+function serverError() {
+  return json({ error: "The orders service is temporarily unavailable. Check the Pages Function logs." }, 500);
+}
+
 function storage(env) {
   return new S3Client({
     region: env.AWS_REGION,
@@ -57,7 +61,12 @@ export async function onRequestPost({ request, env }) {
 export async function onRequestGet({ request, env }) {
   const auth = request.headers.get("Authorization");
   if (!auth || auth !== `Bearer ${env.OWNER_API_TOKEN}`) return json({ error: "Unauthorized" }, 401);
-  const sql = neon(env.DATABASE_URL);
-  const orders = await sql`SELECT id, created_at, status, customer_name, customer_phone, pickup_details, pickup_time, items_json, total FROM orders ORDER BY created_at DESC LIMIT 200`;
-  return json({ orders });
+  try {
+    const sql = neon(env.DATABASE_URL);
+    const orders = await sql`SELECT id, created_at, status, customer_name, customer_phone, pickup_details, pickup_time, items_json, total FROM orders ORDER BY created_at DESC LIMIT 200`;
+    return json({ orders });
+  } catch (error) {
+    console.error("Owner orders query failed", error);
+    return serverError();
+  }
 }
