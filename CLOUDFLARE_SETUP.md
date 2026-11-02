@@ -61,7 +61,24 @@ Framework preset: None
 Build command: npm run build
 Build output directory: /
 Root directory: /
+Deploy command: leave empty
 ```
+
+This project is a **Cloudflare Pages** project, not a Workers project. Do not configure:
+
+```text
+npx wrangler deploy
+```
+
+That command deploys a Worker and fails when the repository contains root static files together with a Pages `functions/` directory. When the repository is connected through Pages Git integration, Cloudflare automatically deploys the static files and Pages Functions after the build completes.
+
+If you prefer a CLI deployment instead of Git integration, use the Pages command, not the Workers command:
+
+```powershell
+npx wrangler pages deploy . --project-name revys-bakes
+```
+
+However, use only one deployment method. For this repository, Git integration is recommended.
 
 The Pages Function is deployed automatically from:
 
